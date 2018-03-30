@@ -1,1 +1,73 @@
+/* main.c */
+
+#include <stdio.h>
+
+int mina(){
+  puts("hello");
+  puts("world");
+  return 0;
+}
+
+/* 利用 gdb 觀察 Lazing Binding 的現象 */ （使用的工具為 gdb-peda）
+gdb ./a.out
+
+b *main  // 設斷點在 main
+r        // 執行，會停在 main
+n        // 下一個執令(直到 puts）
+si       // 進入 puts
+
+會發現
+   0x4003f0:	push   QWORD PTR [rip+0x200c12]        # 0x601008
+   0x4003f6:	jmp    QWORD PTR [rip+0x200c14]        # 0x601010
+   0x4003fc:	nop    DWORD PTR [rax+0x0]
+=> 0x400400 <puts@plt>:	jmp    QWORD PTR [rip+0x200c12]        # 0x601018
+ | 0x400406 <puts@plt+6>:	push   0x0
+ | 0x40040b <puts@plt+11>:	jmp    0x4003f0
+ | 0x400410 <__libc_start_main@plt>:	jmp    QWORD PTR [rip+0x200c0a]        # 0x601020
+ | 0x400416 <__libc_start_main@plt+6>:	push   0x1
+ |->   0x400406 <puts@plt+6>:	push   0x0
+       0x40040b <puts@plt+11>:	jmp    0x4003f0
+       0x400410 <__libc_start_main@plt>:	jmp    QWORD PTR [rip+0x200c0a]        # 0x601020
+       0x400416 <__libc_start_main@plt+6>:	push   0x1
+
+
+箭頭指到的那行顯示 0x400406
+我們可以用 disas 0x400406 來看看是什麼
+
+Dump of assembler code for function puts@plt:
+   0x0000000000400400 <+0>:	jmp    QWORD PTR [rip+0x200c12]        # 0x601018
+   0x0000000000400406 <+6>:	push   0x0
+   0x000000000040040b <+11>:	jmp    0x4003f0
+End of assembler dump.
+
+結果發現是 puts@plt，代表 GOT 目前寫入的是 plt 的位址
+
+
+接著，在 0x4003f0 設第二個斷點
+
+b *0x4003f0
+r          // 因為有第2個 puts 所以會再次走到此位址
+si 
+
+會發現
+   0x4003ec:	add    BYTE PTR [rax],al
+   0x4003ee:	add    BYTE PTR [rax],al
+   0x4003f0:	push   QWORD PTR [rip+0x200c12]        # 0x601008
+=> 0x4003f6:	jmp    QWORD PTR [rip+0x200c14]        # 0x601010
+ | 0x4003fc:	nop    DWORD PTR [rax+0x0]
+ | 0x400400 <puts@plt>:	jmp    QWORD PTR [rip+0x200c12]        # 0x601018
+ | 0x400406 <puts@plt+6>:	push   0x0
+ | 0x40040b <puts@plt+11>:	jmp    0x4003f0
+ |->   0x7ffff7dee870 <_dl_runtime_resolve_avx>:	push   rbx
+       0x7ffff7dee871 <_dl_runtime_resolve_avx+1>:	mov    rbx,rsp
+       0x7ffff7dee874 <_dl_runtime_resolve_avx+4>:	and    rsp,0xffffffffffffffe0
+       0x7ffff7dee878 <_dl_runtime_resolve_avx+8>:	sub    rsp,0x180
+       
+此時，GOT 已經被寫入 0x7ffff7dee870
+
+接著，按
+n      
+就會發現跳到 push 的位址在 libc 的位址，而非 plt 的位址
+
+0x7ffff7dee870 <_dl_runtime_resolve_avx>:	push   rbx
 
