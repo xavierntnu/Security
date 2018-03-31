@@ -1,1 +1,2 @@
-開啟 PIE：  gcc hello.c -pie -fPIC
+關閉方式： echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+預設是 2
