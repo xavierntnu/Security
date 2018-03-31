@@ -2,7 +2,6 @@
 
 int main()
 {
-  int (*ptr)() = main;
-  printf("%p\n", main);
+  printf("main at %p\n", &main);
   return 0;
 }
