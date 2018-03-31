@@ -1,0 +1,6 @@
+有開保護：
+
+ 804849f:	65 33 15 14 00 00 00 	xor    %gs:0x14,%edx
+ 80484a6:	74 05                	je     80484ad <main+0x42>
+ 80484a8:	e8 83 fe ff ff       	call   8048330 <__stack_chk_fail@plt>
+
